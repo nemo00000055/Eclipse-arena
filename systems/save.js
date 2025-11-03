@@ -1,58 +1,74 @@
 /**
- * save.js
- * Persist and restore game state to localStorage for v0.1.
- * Includes versioning so we can migrate later when schemas change.
+ * /src/systems/save.js
+ * v0.1 Save/Load service (localStorage). Version tag is a string 'v0.1'.
+ * APIs:
+ *  - save(state, versionTag = 'v0.1') -> boolean
+ *  - load() -> { version: string, roster: array } | null
+ *  - migrate(oldObj) -> { version: string, roster: array }
+ *
+ * Back-compat wrappers kept: saveGameState(), loadGameState()
  */
 
-import { getRoster, setRoster } from './roster.js';
+import { listUnits, setRoster } from './roster.js';
 
 const SAVE_KEY = 'eclipseSummonersSave';
-const SAVE_VERSION = 1;
+const CURRENT_VERSION = 'v0.1';
 
 /**
- * saveGameState()
- * Grabs current roster and stores it.
+ * Migrate various historical formats into the current v0.1 shape.
+ * Supported legacy:
+ *  - { version: 1, roster: [...] }  // pre-v0.1 numeric version
+ *  - { roster: [...] }               // missing version (very early)
  */
-export function saveGameState() {
-  const state = {
-    version: SAVE_VERSION,
-    roster: getRoster(),
+export function migrate(oldObj) {
+  if (!oldObj || typeof oldObj !== 'object') {
+    return { version: CURRENT_VERSION, roster: [] };
+  }
+  // If already in v0.1 format
+  if (typeof oldObj.version === 'string') {
+    return { version: oldObj.version, roster: Array.isArray(oldObj.roster) ? oldObj.roster : [] };
+  }
+  // Older numeric version -> map to v0.1
+  if (typeof oldObj.version === 'number') {
+    return { version: CURRENT_VERSION, roster: Array.isArray(oldObj.roster) ? oldObj.roster : [] };
+  }
+  // No version field
+  return { version: CURRENT_VERSION, roster: Array.isArray(oldObj.roster) ? oldObj.roster : [] };
+}
+
+export function save(state, versionTag = CURRENT_VERSION) {
+  const payload = {
+    version: String(versionTag),
+    roster: Array.isArray(state?.roster) ? state.roster : listUnits(),
   };
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
     return true;
-  } catch (err) {
-    console.error('saveGameState error:', err);
+  } catch {
     return false;
   }
 }
 
-/**
- * loadGameState()
- * Loads from localStorage and attempts to migrate if needed.
- * Returns true if loaded something, false if not found.
- */
-export function loadGameState() {
+export function load() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) {
-      return false;
-    }
+    if (!raw) return null;
     const parsed = JSON.parse(raw);
-
-    // basic forward-compat skeleton for future migrations
-    if (!parsed.version) {
-      // hypothetically migrate older format; not needed yet
-    }
-
-    if (Array.isArray(parsed.roster)) {
-      setRoster(parsed.roster);
-    } else {
-      setRoster([]);
-    }
-    return true;
-  } catch (err) {
-    console.error('loadGameState error:', err);
-    return false;
+    const migrated = migrate(parsed);
+    return migrated;
+  } catch {
+    return null;
   }
+}
+
+// --- Back-compat wrappers used by older FE stubs
+export function saveGameState() {
+  return save({ roster: listUnits() }, CURRENT_VERSION);
+}
+
+export function loadGameState() {
+  const data = load();
+  if (!data) return false;
+  setRoster(Array.isArray(data.roster) ? data.roster : []);
+  return true;
 }

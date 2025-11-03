@@ -1,12 +1,35 @@
-/**
- * events.js
- * Attaches DOM event listeners to buttons and wires them to backend systems.
- */
+// events.js
+// Attaches DOM event listeners to buttons and wires them to backend systems.
 
 import { summonRandomUnit, getRoster } from '../systems/roster.js';
 import { simulateBattle } from '../systems/combat.js';
 import { saveGameState, loadGameState } from '../systems/save.js';
-import { writeRosterToDOM, appendBattleLog, openModal, closeModal, handleGlobalKeydown } from './panels.js';
+import { writeRosterToDOM, appendBattleLog, openModal, closeModal, handleGlobalKeydown, setLastInvoker } from './panels.js';
+
+function buildResultCard(titleText, metaText, statsText) {
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  const title = document.createElement('div');
+  title.className = 'title';
+  title.textContent = titleText;
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.textContent = metaText;
+  card.appendChild(title);
+  card.appendChild(meta);
+  if (statsText) {
+    const stats = document.createElement('div');
+    stats.className = 'stats';
+    stats.textContent = statsText;
+    card.appendChild(stats);
+  }
+  return card;
+}
+
+function initLoadButtonState() {
+  const btnLoad = document.getElementById('btn-load');
+  if (btnLoad) btnLoad.disabled = true; // disabled until a save occurs
+}
 
 export function initUIBindings() {
   const btnSummon = document.getElementById('btn-summon');
@@ -15,50 +38,51 @@ export function initUIBindings() {
   const btnLoad = document.getElementById('btn-load');
   const btnModalClose = document.getElementById('modal-close');
 
-  // Summon button: add a unit to roster
+  initLoadButtonState();
+
   if (btnSummon) {
     btnSummon.addEventListener('click', () => {
       const newUnit = summonRandomUnit();
       writeRosterToDOM(getRoster());
       appendBattleLog(`Summoned: ${newUnit.name} [${newUnit.element}]`);
+      const card = buildResultCard('Summon Result', `${newUnit.name} — ${newUnit.element}`, `LV${newUnit.level}  HP:${newUnit.hp}  ATK:${newUnit.atk}`);
+      setLastInvoker(btnSummon);
+      openModal('Summon', card);
     });
   }
 
-  // Battle button: run combat sim and print result
   if (btnBattle) {
     btnBattle.addEventListener('click', () => {
       const report = simulateBattle();
       appendBattleLog(report.summary);
-      if (report.details) {
-        openModal('Battle Report', report.details);
-      }
+      const card = buildResultCard('Battle Report', report.summary, report.details || '');
+      setLastInvoker(btnBattle);
+      openModal('Battle', card);
     });
   }
 
-  // Save button
   if (btnSave) {
     btnSave.addEventListener('click', () => {
       saveGameState();
       appendBattleLog('Game saved.');
+      if (btnLoad) btnLoad.disabled = false;
     });
   }
 
-  // Load button
   if (btnLoad) {
     btnLoad.addEventListener('click', () => {
-      const loadedOK = loadGameState();
+      const ok = loadGameState();
       writeRosterToDOM(getRoster());
-      appendBattleLog(loadedOK ? 'Game loaded.' : 'No save found.');
+      appendBattleLog(ok ? 'Game loaded.' : 'No save found.');
+      btnLoad.disabled = !ok;
     });
   }
 
-  // Modal close
   if (btnModalClose) {
     btnModalClose.addEventListener('click', () => {
       closeModal();
     });
   }
 
-  // Escape key handling for modal close
   document.addEventListener('keydown', handleGlobalKeydown);
 }

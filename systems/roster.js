@@ -1,65 +1,53 @@
 /**
- * roster.js
- * Player's summoned units live here (in-memory).
- * Also defines the pool of possible summons for v0.1 baseline.
+ * /src/systems/roster.js
+ * In-memory roster model for v0.1.
+ * APIs:
+ *  - addUnit(unit)
+ *  - getFirstUnit()
+ *  - listUnits()              // returns a shallow copy
+ *  - rollUnit()               // create & add a unit chosen deterministically from summonPool
+ *
+ * Back-compat:
+ *  - getRoster(), setRoster(), summonRandomUnit() wrappers retained.
  */
 
-import { randInt } from './rng.js';
+import { nextInt } from './rng.js';
 
-// This is our active player roster (not persisted until saveGameState()).
-let playerRoster = [];
+let _playerRoster = [];
 
-// A minimal summon pool for v0.1
+// Minimal summon pool for v0.1 (no rarity, no elements used in combat logic)
 const summonPool = [
-  {
-    name: 'Lyra Stormborne',
-    element: 'Storm',
-    baseHP: 120,
-    baseATK: 30,
-  },
-  {
-    name: 'Draegon of Embers',
-    element: 'Fire',
-    baseHP: 150,
-    baseATK: 40,
-  },
-  {
-    name: 'Kairon Whisperleaf',
-    element: 'Wind',
-    baseHP: 100,
-    baseATK: 35,
-  },
-  {
-    name: 'Selene Umbra',
-    element: 'Dark',
-    baseHP: 110,
-    baseATK: 28,
-  },
-  {
-    name: 'Eldros Titanheart',
-    element: 'Earth',
-    baseHP: 180,
-    baseATK: 20,
-  },
+  { name: 'Lyra Stormborne',  element: 'Storm', baseHP: 120, baseATK: 30 },
+  { name: 'Draegon of Embers', element: 'Fire',  baseHP: 150, baseATK: 40 },
+  { name: 'Kairon Whisperleaf', element: 'Wind',  baseHP: 100, baseATK: 35 },
+  { name: 'Selene Umbra',     element: 'Dark',  baseHP: 110, baseATK: 28 },
+  { name: 'Eldros Titanheart', element: 'Earth', baseHP: 180, baseATK: 20 },
 ];
 
-export function getRoster() {
-  return playerRoster;
+export function addUnit(unit) {
+  // Minimal shape guard
+  const u = {
+    name: String(unit?.name ?? 'Unknown'),
+    element: String(unit?.element ?? 'Neutral'),
+    level: Number(unit?.level ?? 1),
+    hp: Number(unit?.hp ?? 1),
+    atk: Number(unit?.atk ?? 1),
+  };
+  _playerRoster.push(u);
+  return u;
 }
 
-export function setRoster(newRoster) {
-  playerRoster = Array.isArray(newRoster) ? newRoster : [];
+export function getFirstUnit() {
+  return _playerRoster.length ? _playerRoster[0] : null;
 }
 
-/**
- * summonRandomUnit()
- * Picks one summon from summonPool using deterministic RNG,
- * creates a leveled instance, and pushes it into playerRoster.
- */
-export function summonRandomUnit() {
-  const rollIndex = randInt(0, summonPool.length - 1);
-  const base = summonPool[rollIndex];
+export function listUnits() {
+  return _playerRoster.slice();
+}
 
+export function rollUnit() {
+  const idx = nextInt(0, summonPool.length - 1);
+  const base = summonPool[idx];
   const unit = {
     name: base.name,
     element: base.element,
@@ -67,7 +55,11 @@ export function summonRandomUnit() {
     hp: base.baseHP,
     atk: base.baseATK,
   };
-
-  playerRoster.push(unit);
+  addUnit(unit);
   return unit;
 }
+
+// --- Back-compat helpers (used by older FE stubs)
+export function getRoster() { return _playerRoster; }
+export function setRoster(newRoster) { _playerRoster = Array.isArray(newRoster) ? newRoster : []; }
+export function summonRandomUnit() { return rollUnit(); }

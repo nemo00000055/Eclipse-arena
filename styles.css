@@ -173,3 +173,27 @@ footer {
   overflow-y: auto;
   white-space: pre-line;
 }
+
+/* simple card UI used by summon/battle panels */
+.result-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  border: 1px solid #3a3a60;
+  border-radius: 6px;
+  padding: 0.75rem;
+  background-color: #0f0f1a;
+}
+.result-card .title {
+  font-weight: 700;
+  color: #ffffff;
+}
+.result-card .meta {
+  font-size: 0.85rem;
+  color: #cfcfff;
+}
+.result-card .stats {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.8rem;
+  color: #bcbcff;
+}
