@@ -32,6 +32,9 @@ export function appendBattleLog(line) {
   box.scrollTop = box.scrollHeight;
 }
 
+/**
+ * Open modal. Accepts either a string (rendered as text) or a DOM Node.
+ */
 export function openModal(title, body) {
   const overlay = modalOverlayEl();
   if (!overlay) return;
