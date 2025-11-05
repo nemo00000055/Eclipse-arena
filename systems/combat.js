@@ -1,63 +1,70 @@
 /**
- * combat.js
- * Simulate a simple battle between the first unit in roster and a dummy enemy.
- * This is intentionally basic for v0.1 — QA just needs a deterministic result.
+ * /src/systems/combat.js
+ * v0.1 simulateBattle(opts?) per INTERFACES.md
+ * Exports:
+ *  - simulateBattle(opts?: { enemyName?: string, enemyAtk?: number }): { summary:string, details:string }
+ *
+ * Behavior:
+ *  - Uses first unit in roster as the hero. If none, returns a friendly message.
+ *  - Enemy defaults: name 'Training Dummy', atk 15, hp 120.
+ *  - Deterministic: uses rng.randInt() for small variance.
  */
 
-import { getRoster } from './roster.js';
 import { randInt } from './rng.js';
+import { getRoster } from './roster.js';
 
-/**
- * simulateBattle()
- * Returns:
- * {
- *   summary: string   // short 1-line
- *   details: string   // multiline breakdown
- * }
- */
-export function simulateBattle() {
+export function simulateBattle(opts = {}) {
   const roster = getRoster();
-  if (!roster.length) {
+  const hero = roster && roster.length ? roster[0] : null;
+  if (!hero) {
     return {
-      summary: 'No battle: you have no units. Summon first.',
-      details: 'You attempted to battle with an empty roster. Please summon a unit.',
+      summary: 'No unit available for battle.',
+      details: 'You need to summon a unit before battling.',
     };
   }
 
-  const hero = roster[0];
+  const enemyName = typeof opts.enemyName === 'string' ? opts.enemyName : 'Training Dummy';
+  const enemyAtk  = Number.isFinite(opts.enemyAtk) ? opts.enemyAtk : 15;
 
-  // dummy enemy for now
-  const enemy = {
-    name: 'Wraith of the Fracture',
-    hp: 80,
-    atk: 15,
-  };
+  // Basic enemy stats; hp close to baseline so outcomes vary by seed/unit
+  const enemy = { name: enemyName, hp: 120, atk: enemyAtk };
 
-  // super simple resolution: hero damage roll vs enemy damage roll
-  const heroRoll = hero.atk + randInt(0, 10);
-  const enemyRoll = enemy.atk + randInt(0, 10);
+  // Simulate simple exchange: hero strikes first each turn with small variance
+  let hHP = hero.hp;
+  let eHP = enemy.hp;
+  let turns = 0;
+  let heroTotal = 0;
+  let enemyTotal = 0;
+  const TURN_CAP = 100;
 
-  let winner;
-  if (heroRoll >= enemyRoll) {
-    winner = hero.name;
-  } else {
-    winner = enemy.name;
+  while (hHP > 0 && eHP > 0 && turns < TURN_CAP) {
+    const heroVariance = randInt(0, 5);
+    const enemyVariance = randInt(0, 5);
+    const heroHit = Math.max(0, hero.atk + heroVariance);
+    const enemyHit = Math.max(0, enemy.atk + enemyVariance);
+
+    // Hero hits first
+    eHP -= heroHit;
+    heroTotal += heroHit;
+    if (eHP <= 0) break;
+
+    // Enemy counter
+    hHP -= enemyHit;
+    enemyTotal += enemyHit;
+    turns += 1;
   }
+  if (turns === 0 && hHP > 0 && eHP <= 0) turns = 1; // single-turn KO normalization
 
-  const details =
-`BATTLE START
-Your Unit: ${hero.name} (ATK ${hero.atk})
-Enemy: ${enemy.name} (ATK ${enemy.atk})
+  const outcome = (eHP <= 0 && hHP > 0) ? 'WIN' : 'LOSE';
 
-Rolls:
-- ${hero.name}: ${heroRoll}
-- ${enemy.name}: ${enemyRoll}
+  const summary = `${hero.name} vs ${enemy.name} \u2192 ${outcome} in ${turns} turn${turns===1?'':'s'}.`;
+  const details = [
+    `Hero: ${hero.name} (HP ${hero.hp}, ATK ${hero.atk})`,
+    `Enemy: ${enemy.name} (HP ${enemy.hp}, ATK ${enemy.atk})`,
+    `Turns: ${turns}`,
+    `Damage dealt: Hero ${heroTotal} / Enemy ${enemyTotal}`,
+    `Outcome: ${outcome}`,
+  ].join('\n');
 
-Winner: ${winner}
-`;
-
-  return {
-    summary: `Battle resolved. Winner: ${winner}`,
-    details,
-  };
+  return { summary, details };
 }

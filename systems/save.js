@@ -1,58 +1,56 @@
 /**
- * save.js
- * Persist and restore game state to localStorage for v0.1.
- * Includes versioning so we can migrate later when schemas change.
+ * /src/systems/save.js
+ * v0.1 Save/Load per INTERFACES.md and STATE_SCHEMA.md
+ * Exports:
+ *  - SAVE_KEY:string = 'eclipseSummonersSave'
+ *  - SAVE_VERSION:number = 1
+ *  - saveGameState():boolean
+ *  - loadGameState():boolean
+ *  - migrate(state:any):SaveState
+ *
+ * SaveState shape:
+ *  { version:number, roster: Unit[] }
  */
 
 import { getRoster, setRoster } from './roster.js';
 
-const SAVE_KEY = 'eclipseSummonersSave';
-const SAVE_VERSION = 1;
+export const SAVE_KEY = 'eclipseSummonersSave';
+export const SAVE_VERSION = 1;
 
-/**
- * saveGameState()
- * Grabs current roster and stores it.
- */
+// Accepts legacy shapes and returns normalized {version:1, roster:[]}
+export function migrate(state) {
+  if (!state || typeof state !== 'object') {
+    return { version: SAVE_VERSION, roster: [] };
+  }
+  // Handle earlier experimental string version e.g., 'v0.1'
+  if (typeof state.version === 'string') {
+    return { version: SAVE_VERSION, roster: Array.isArray(state.roster) ? state.roster : [] };
+  }
+  // Numeric version
+  const v = Number.isFinite(state.version) ? state.version : SAVE_VERSION;
+  const roster = Array.isArray(state.roster) ? state.roster : [];
+  return { version: v, roster };
+}
+
 export function saveGameState() {
-  const state = {
-    version: SAVE_VERSION,
-    roster: getRoster(),
-  };
+  const data = { version: SAVE_VERSION, roster: getRoster() };
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     return true;
-  } catch (err) {
-    console.error('saveGameState error:', err);
+  } catch {
     return false;
   }
 }
 
-/**
- * loadGameState()
- * Loads from localStorage and attempts to migrate if needed.
- * Returns true if loaded something, false if not found.
- */
 export function loadGameState() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) {
-      return false;
-    }
+    if (!raw) return false;
     const parsed = JSON.parse(raw);
-
-    // basic forward-compat skeleton for future migrations
-    if (!parsed.version) {
-      // hypothetically migrate older format; not needed yet
-    }
-
-    if (Array.isArray(parsed.roster)) {
-      setRoster(parsed.roster);
-    } else {
-      setRoster([]);
-    }
+    const normalized = migrate(parsed);
+    setRoster(Array.isArray(normalized.roster) ? normalized.roster : []);
     return true;
-  } catch (err) {
-    console.error('loadGameState error:', err);
+  } catch {
     return false;
   }
 }
