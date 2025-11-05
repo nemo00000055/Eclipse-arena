@@ -1,70 +1,60 @@
+
 /**
  * /src/systems/combat.js
- * v0.1 simulateBattle(opts?) per INTERFACES.md
- * Exports:
- *  - simulateBattle(opts?: { enemyName?: string, enemyAtk?: number }): { summary:string, details:string }
- *
- * Behavior:
- *  - Uses first unit in roster as the hero. If none, returns a friendly message.
- *  - Enemy defaults: name 'Training Dummy', atk 15, hp 120.
- *  - Deterministic: uses rng.randInt() for small variance.
+ * Auto-battle logic (pure I/O) with structured results & validation.
+ * Internal export name: simulateBattle (façade maps to simulateAutoBattle).
  */
 
-import { randInt } from './rng.js';
-import { getRoster } from './roster.js';
+import { rng } from './rng.js';
 
-export function simulateBattle(opts = {}) {
-  const roster = getRoster();
-  const hero = roster && roster.length ? roster[0] : null;
-  if (!hero) {
-    return {
-      summary: 'No unit available for battle.',
-      details: 'You need to summon a unit before battling.',
-    };
+/**
+ * Validate a unit-like object.
+ */
+function isUnit(u){
+  return u && Number.isFinite(+u.hp) && Number.isFinite(+u.atk);
+}
+
+/**
+ * Simulate battle between playerUnit and dummyEnemy.
+ * Returns:
+ *   - on success: { ok:true, outcome:'WIN'|'LOSE', turns:number, damageSummary:{ player:number, enemy:number } }
+ *   - on bad input: { ok:false, code:'BAD_INPUT', message:string }
+ */
+export function simulateBattle(playerUnit, dummyEnemy){
+  if (!isUnit(playerUnit)) {
+    return { ok:false, code:'BAD_INPUT', message:'playerUnit must have numeric hp and atk.' };
+  }
+  if (!isUnit(dummyEnemy)) {
+    return { ok:false, code:'BAD_INPUT', message:'dummyEnemy must have numeric hp and atk.' };
   }
 
-  const enemyName = typeof opts.enemyName === 'string' ? opts.enemyName : 'Training Dummy';
-  const enemyAtk  = Number.isFinite(opts.enemyAtk) ? opts.enemyAtk : 15;
+  const hero = { hp: +playerUnit.hp, atk: +playerUnit.atk };
+  const enemy = { hp: +dummyEnemy.hp, atk: +dummyEnemy.atk };
 
-  // Basic enemy stats; hp close to baseline so outcomes vary by seed/unit
-  const enemy = { name: enemyName, hp: 120, atk: enemyAtk };
-
-  // Simulate simple exchange: hero strikes first each turn with small variance
+  let turns = 0;
   let hHP = hero.hp;
   let eHP = enemy.hp;
-  let turns = 0;
-  let heroTotal = 0;
+  let playerTotal = 0;
   let enemyTotal = 0;
   const TURN_CAP = 100;
 
-  while (hHP > 0 && eHP > 0 && turns < TURN_CAP) {
-    const heroVariance = randInt(0, 5);
-    const enemyVariance = randInt(0, 5);
-    const heroHit = Math.max(0, hero.atk + heroVariance);
-    const enemyHit = Math.max(0, enemy.atk + enemyVariance);
+  while (hHP > 0 && eHP > 0 && turns < TURN_CAP){
+    const heroVar = rng.randInt(0,5);
+    const enemyVar = rng.randInt(0,5);
+    const heroHit = Math.max(0, hero.atk + heroVar);
+    const enemyHit = Math.max(0, enemy.atk + enemyVar);
 
-    // Hero hits first
+    // hero strikes first
     eHP -= heroHit;
-    heroTotal += heroHit;
+    playerTotal += heroHit;
     if (eHP <= 0) break;
 
-    // Enemy counter
     hHP -= enemyHit;
     enemyTotal += enemyHit;
     turns += 1;
   }
-  if (turns === 0 && hHP > 0 && eHP <= 0) turns = 1; // single-turn KO normalization
+  if (turns === 0 && hHP > 0 && eHP <= 0) turns = 1;
 
   const outcome = (eHP <= 0 && hHP > 0) ? 'WIN' : 'LOSE';
-
-  const summary = `${hero.name} vs ${enemy.name} \u2192 ${outcome} in ${turns} turn${turns===1?'':'s'}.`;
-  const details = [
-    `Hero: ${hero.name} (HP ${hero.hp}, ATK ${hero.atk})`,
-    `Enemy: ${enemy.name} (HP ${enemy.hp}, ATK ${enemy.atk})`,
-    `Turns: ${turns}`,
-    `Damage dealt: Hero ${heroTotal} / Enemy ${enemyTotal}`,
-    `Outcome: ${outcome}`,
-  ].join('\n');
-
-  return { summary, details };
+  return { ok:true, outcome, turns, damageSummary:{ player: playerTotal, enemy: enemyTotal } };
 }

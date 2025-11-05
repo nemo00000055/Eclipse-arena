@@ -1,56 +1,56 @@
+
 /**
  * /src/systems/save.js
- * v0.1 Save/Load per INTERFACES.md and STATE_SCHEMA.md
- * Exports:
- *  - SAVE_KEY:string = 'eclipseSummonersSave'
- *  - SAVE_VERSION:number = 1
- *  - saveGameState():boolean
- *  - loadGameState():boolean
- *  - migrate(state:any):SaveState
- *
- * SaveState shape:
- *  { version:number, roster: Unit[] }
+ * Structured save/load with migration scaffold and sanitization.
+ * Façade re-exports saveGameState as save, loadGameState as load, and migrate.
  */
 
-import { getRoster, setRoster } from './roster.js';
+import { listUnits, setRoster } from './roster.js';
 
 export const SAVE_KEY = 'eclipseSummonersSave';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION_TAG = 'v0.1';
 
-// Accepts legacy shapes and returns normalized {version:1, roster:[]}
-export function migrate(state) {
-  if (!state || typeof state !== 'object') {
-    return { version: SAVE_VERSION, roster: [] };
+/**
+ * Sanitize and normalize state object to current schema.
+ * Returns { ok:true, state, from:'v0.1', to:'v0.1' } in v0.1 (no-op),
+ * or { ok:false, code:'SCHEMA', message } if irrecoverable.
+ */
+export function migrate(state){
+  const base = { version: SAVE_VERSION_TAG, roster: [] };
+  if (!state || typeof state !== 'object'){
+    return { ok:true, state: base, from: SAVE_VERSION_TAG, to: SAVE_VERSION_TAG };
   }
-  // Handle earlier experimental string version e.g., 'v0.1'
-  if (typeof state.version === 'string') {
-    return { version: SAVE_VERSION, roster: Array.isArray(state.roster) ? state.roster : [] };
-  }
-  // Numeric version
-  const v = Number.isFinite(state.version) ? state.version : SAVE_VERSION;
+  // Accept unknown fields but strip them
+  const version = typeof state.version === 'string' ? state.version : SAVE_VERSION_TAG;
   const roster = Array.isArray(state.roster) ? state.roster : [];
-  return { version: v, roster };
+  return { ok:true, state: { version, roster }, from: version, to: SAVE_VERSION_TAG };
 }
 
-export function saveGameState() {
-  const data = { version: SAVE_VERSION, roster: getRoster() };
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    return true;
-  } catch {
-    return false;
+export function saveGameState(){
+  try{
+    const payload = { version: SAVE_VERSION_TAG, roster: listUnits() };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+    return { ok:true, state: payload };
+  }catch(e){
+    return { ok:false, code:'UNKNOWN', message: String(e && e.message || 'save failed') };
   }
 }
 
-export function loadGameState() {
-  try {
+export function loadGameState(){
+  try{
     const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return false;
+    if (!raw){
+      return { ok:false, code:'NOT_FOUND', message:'no saved state' };
+    }
     const parsed = JSON.parse(raw);
-    const normalized = migrate(parsed);
-    setRoster(Array.isArray(normalized.roster) ? normalized.roster : []);
-    return true;
-  } catch {
-    return false;
+    const mig = migrate(parsed);
+    if (!mig.ok){
+      return { ok:false, code:'SCHEMA', message:'failed to migrate state' };
+    }
+    // Apply sanitized roster to memory
+    setRoster(Array.isArray(mig.state.roster) ? mig.state.roster : []);
+    return { ok:true, state: mig.state };
+  }catch(e){
+    return { ok:false, code:'SCHEMA', message:'corrupt or unreadable save' };
   }
 }
