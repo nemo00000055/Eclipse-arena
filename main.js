@@ -1,18 +1,17 @@
+
 /**
- * main.js
- * Entry point for v0.1 baseline.
- * Wires UI events to backend systems and handles basic render updates.
+ * main.js (v0.1.1)
+ * Entry point that wires UI and bootstraps state.
  */
-
 import { initUIBindings } from './ui/events.js';
-import { getRoster } from './systems/roster.js';
-import { writeRosterToDOM } from './ui/panels.js';
+import { writeRosterToDOM, writeInventoryToDOM } from './ui/panels.js';
+import { initState, getState } from './ui/state.js';
 
-// bootstrap app state
-(function bootstrap() {
-  // At load, render whatever roster we have (likely empty first run)
-  writeRosterToDOM(getRoster());
-
-  // Setup button listeners, escape handling, etc.
-  initUIBindings();
+(function bootstrap(){
+  document.addEventListener('DOMContentLoaded', () => {
+    initState();
+    writeRosterToDOM(getState());
+    writeInventoryToDOM(getState());
+    initUIBindings();
+  });
 })();

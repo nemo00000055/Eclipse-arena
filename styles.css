@@ -173,3 +173,13 @@ footer {
   overflow-y: auto;
   white-space: pre-line;
 }
+
+/* v0.1.1 additions */
+.sr-only { position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden; }
+.inline { margin-left: 0.5rem; display: inline-flex; align-items: center; gap: 0.25rem; color:#cfd3ff; }
+#actions-bar { display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:center; padding:0.5rem; background:#141429; border-bottom:1px solid #2e2e4a; }
+#log { max-height: 220px; overflow:auto; }
+.scrollbox { max-height: 220px; overflow:auto; }
+button:focus-visible, .close-btn:focus-visible { outline: 2px solid #7aa2ff; outline-offset:2px; }
+.hidden { display:none; }
+.modal-body { max-height: 60vh; overflow:auto; }

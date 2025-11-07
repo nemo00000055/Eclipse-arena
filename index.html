@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Eclipse Summoners: Skyfall Arena (v0.1 baseline)</title>
+  <title>Eclipse Summoners: Skyfall Arena (v0.1.1 UI)</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -13,12 +13,24 @@
       <p class="tagline">Restore the light beyond the Eclipse.</p>
     </header>
 
+    <div id="status-live" aria-live="polite" class="sr-only"></div>
+
     <section id="controls">
       <button id="btn-summon" class="primary">Summon</button>
       <button id="btn-battle" class="primary">Battle</button>
       <button id="btn-save" class="secondary">Save</button>
       <button id="btn-load" class="secondary">Load</button>
+      <button id="btn-inventory" class="secondary">Inventory</button>
     </section>
+
+    
+    <section id="actions-bar" aria-label="Actions">
+      <button id="btn-action-normal" class="primary">Normal</button>
+      <button id="btn-action-special" class="primary" aria-disabled="true" data-cooldown="0">Special</button>
+      <label for="chk-auto" class="inline"><input type="checkbox" id="chk-auto" /> Auto</label>
+      <label for="rng-speed" class="inline">Speed <input type="range" id="rng-speed" min="1" max="4" value="1" /></label>
+    </section>
+
 
     <section id="status-panels">
       <div class="panel">
@@ -28,7 +40,7 @@
 
       <div class="panel">
         <h2>Battle Log</h2>
-        <div id="battle-log" class="scrollbox" tabindex="0" aria-label="Battle log output"></div>
+        <div id="log" class="scrollbox" tabindex="0" aria-label="Battle log output"></div>
       </div>
     </section>
   </main>
@@ -40,12 +52,12 @@
         <h2 id="modal-title">Panel</h2>
         <button id="modal-close" class="close-btn" aria-label="Close panel">✕</button>
       </div>
-      <div id="modal-body" class="modal-body"></div>
+      <div id="modal-body" class="modal-body"><div id="inventory-panel" class="hidden"></div></div>
     </div>
   </div>
 
   <footer>
-    <small>v0.1 baseline — Offline prototype</small>
+    <small>v0.1.1 UI — Offline prototype</small>
   </footer>
 
   <script type="module" src="./main.js"></script>

@@ -1,60 +1,61 @@
+// /src/systems/combat.js
+// v0.1.1 logic-only combat + façade wrapper simulateAutoBattle()
+// - simulateCombat(input)
+// - simulateAutoBattle(config) -> convenience wrapper for auto special use
 
-/**
- * /src/systems/combat.js
- * Auto-battle logic (pure I/O) with structured results & validation.
- * Internal export name: simulateBattle (façade maps to simulateAutoBattle).
- */
+import { makeRng } from './rng.js';
+import { calcStats, setBonus } from './equipment.js';
 
-import { rng } from './rng.js';
+export function simulateCombat(input){
+  const cfg = input||{};
+  makeRng(cfg.seed||1); // ensure deterministic sequence even if not used further
+  const heroStats = calcStats(cfg.hero||{});
+  const hero = { hp: (cfg.heroHp ?? 100), ...heroStats };
+  const enemy = { hp: (cfg.enemyHp ?? 120), atk: cfg.enemyAtk ?? 15, def: cfg.enemyDef ?? 5, name: cfg.enemyName ?? 'Training Dummy' };
+  const lifesteal = hero.lifesteal||0;
+  const cdOffset = setBonus(cfg.hero||{}).cooldownMod||0;
+  let specialCd = Math.max(1, (cfg.specialCd ?? 5) + cdOffset);
+  let cd = 0;
+  const speed = Math.max(1, Math.min(4, cfg.speed || 1));
+  const log = [];
+  let turn = 0;
 
-/**
- * Validate a unit-like object.
- */
-function isUnit(u){
-  return u && Number.isFinite(+u.hp) && Number.isFinite(+u.atk);
+  while(hero.hp>0 && enemy.hp>0 && turn<200){
+    turn++;
+    // Hero turn
+    let dmg = Math.max(1, Math.floor((hero.atk ?? 10) - enemy.def));
+    if (cd===0 && cfg.auto){
+      dmg = Math.floor(dmg*1.5); // special
+      cd = specialCd;
+      if (cfg.battleLog) log.push(`Turn ${turn}: Special hits for ${dmg}`);
+    } else {
+      if (cfg.battleLog) log.push(`Turn ${turn}: Hit for ${dmg}`);
+      cd = Math.max(0, cd-1);
+    }
+    enemy.hp -= dmg;
+
+    if (lifesteal>0){
+      const heal = Math.min(dmg, lifesteal);
+      hero.hp = Math.min((cfg.heroHp ?? 100), hero.hp + heal);
+      if (cfg.battleLog) log.push(`Lifesteal +${heal}`);
+    }
+    if (enemy.hp<=0) break;
+
+    // Enemy turn
+    const edmg = Math.max(1, Math.floor((enemy.atk ?? 10) - (hero.def ?? 0)));
+    hero.hp -= edmg;
+    if (cfg.battleLog) log.push(`Enemy hits for ${edmg}`);
+
+    // Speed is a logic param; does not change outcomes (no RNG scaling), loop bound kept deterministic
+    (void)speed;
+  }
+
+  const result = hero.hp>0 ? 'WIN':'LOSS';
+  return { result, turns: turn, enemy: enemy.name, log: (cfg.battleLog ? log : []) };
 }
 
-/**
- * Simulate battle between playerUnit and dummyEnemy.
- * Returns:
- *   - on success: { ok:true, outcome:'WIN'|'LOSE', turns:number, damageSummary:{ player:number, enemy:number } }
- *   - on bad input: { ok:false, code:'BAD_INPUT', message:string }
- */
-export function simulateBattle(playerUnit, dummyEnemy){
-  if (!isUnit(playerUnit)) {
-    return { ok:false, code:'BAD_INPUT', message:'playerUnit must have numeric hp and atk.' };
-  }
-  if (!isUnit(dummyEnemy)) {
-    return { ok:false, code:'BAD_INPUT', message:'dummyEnemy must have numeric hp and atk.' };
-  }
-
-  const hero = { hp: +playerUnit.hp, atk: +playerUnit.atk };
-  const enemy = { hp: +dummyEnemy.hp, atk: +dummyEnemy.atk };
-
-  let turns = 0;
-  let hHP = hero.hp;
-  let eHP = enemy.hp;
-  let playerTotal = 0;
-  let enemyTotal = 0;
-  const TURN_CAP = 100;
-
-  while (hHP > 0 && eHP > 0 && turns < TURN_CAP){
-    const heroVar = rng.randInt(0,5);
-    const enemyVar = rng.randInt(0,5);
-    const heroHit = Math.max(0, hero.atk + heroVar);
-    const enemyHit = Math.max(0, enemy.atk + enemyVar);
-
-    // hero strikes first
-    eHP -= heroHit;
-    playerTotal += heroHit;
-    if (eHP <= 0) break;
-
-    hHP -= enemyHit;
-    enemyTotal += enemyHit;
-    turns += 1;
-  }
-  if (turns === 0 && hHP > 0 && eHP <= 0) turns = 1;
-
-  const outcome = (eHP <= 0 && hHP > 0) ? 'WIN' : 'LOSE';
-  return { ok:true, outcome, turns, damageSummary:{ player: playerTotal, enemy: enemyTotal } };
+// Façade helper expected by INTERFACES.md
+export function simulateAutoBattle(config){
+  const cfg = { ...(config||{}), auto: true, battleLog: !!config?.battleLog };
+  return simulateCombat(cfg);
 }
